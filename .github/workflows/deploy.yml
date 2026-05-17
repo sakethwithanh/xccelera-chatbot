@@ -26,14 +26,8 @@ jobs:
         with:
           node-version: 20
       - run: npm i -g vercel@latest
-      - run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-      # vercel build strips .env files; export pulled vars so Vite inlines them.
-      - run: |
-          set -a
-          . .vercel/.env.production.local
-          set +a
-          vercel build --prod --token="$VERCEL_TOKEN"
-      - run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      # Remote build on Vercel so Project env vars are injected (VITE_* inlined).
+      - run: vercel deploy --prod --yes --token="$VERCEL_TOKEN"
 
   backend:
     name: Deploy backend
