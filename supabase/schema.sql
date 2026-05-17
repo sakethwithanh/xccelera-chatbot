@@ -59,3 +59,49 @@ create policy "own messages" on public.messages
             where s.id = messages.session_id and s.user_id = auth.uid()
         )
     );
+
+-- ---- RAG: cross-session memory (pgvector) ---------------------------------
+-- Gemini text-embedding-004 = 768 dims.
+create extension if not exists vector;
+
+create table if not exists public.message_embeddings (
+    message_id uuid primary key
+        references public.messages (id) on delete cascade,
+    user_id    uuid not null references auth.users (id) on delete cascade,
+    session_id uuid not null references public.sessions (id) on delete cascade,
+    role       text not null,
+    content    text not null,
+    embedding  vector(768) not null,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists message_embeddings_user_idx
+    on public.message_embeddings (user_id);
+create index if not exists message_embeddings_vec_idx
+    on public.message_embeddings
+    using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+alter table public.message_embeddings enable row level security;
+drop policy if exists "own embeddings" on public.message_embeddings;
+create policy "own embeddings" on public.message_embeddings
+    for all using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+-- Cosine similarity search over the user's prior messages.
+create or replace function public.match_user_messages(
+    query_embedding vector(768),
+    p_user_id uuid,
+    p_exclude_session uuid,
+    match_count int
+)
+returns table (role text, content text, similarity float)
+language sql stable
+as $$
+    select e.role, e.content,
+           1 - (e.embedding <=> query_embedding) as similarity
+    from public.message_embeddings e
+    where e.user_id = p_user_id
+      and (p_exclude_session is null or e.session_id <> p_exclude_session)
+    order by e.embedding <=> query_embedding
+    limit match_count;
+$$;

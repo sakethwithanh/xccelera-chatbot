@@ -35,11 +35,16 @@ def build_graph(checkpointer):
     settings = get_settings()
     llm = _make_llm()
 
-    async def call_model(state: MessagesState) -> dict:
+    async def call_model(state: MessagesState, config) -> dict:
         # Full history lives in the checkpointer; cap what we send to the
         # model for cost/latency. Keep the most recent turns.
         history = state["messages"][-settings.history_limit :]
-        response = await llm.ainvoke([SystemMessage(SYSTEM_PROMPT), *history])
+        prompt = [SystemMessage(SYSTEM_PROMPT)]
+        rag = (config or {}).get("configurable", {}).get("rag_context")
+        if rag:
+            prompt.append(SystemMessage(rag))
+        prompt.extend(history)
+        response = await llm.ainvoke(prompt)
         return {"messages": [response]}
 
     builder = StateGraph(MessagesState)

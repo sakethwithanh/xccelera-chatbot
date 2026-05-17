@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
-from . import db
+from . import db, rag
 from .auth import current_user_id
 from .runtime import ensure_graph
 from .schemas import (
@@ -58,23 +58,39 @@ async def chat(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
     # Mirror the user turn into our table (RLS-owned source of truth for UI).
-    await db.add_message(body.session_id, "user", body.message)
+    user_row = await db.add_message(body.session_id, "user", body.message)
 
     # First message in an untitled session -> derive a title from it.
     if not session.get("title"):
         snippet = " ".join(body.message.split())[:48].strip()
         await db.update_session_title(body.session_id, snippet or "New chat")
 
+    # RAG: pull relevant memory from this user's OTHER sessions.
+    rag_context = await rag.retrieve_context(
+        user_id, body.message, body.session_id
+    )
+
     # LangGraph: thread_id == session_id. The checkpointer loads prior state
     # for this thread, so the model answers with full conversation context.
     graph = await ensure_graph(request.app)
     result = await graph.ainvoke(
         {"messages": [HumanMessage(body.message)]},
-        config={"configurable": {"thread_id": body.session_id}},
+        config={
+            "configurable": {
+                "thread_id": body.session_id,
+                "rag_context": rag_context,
+            }
+        },
     )
     reply = result["messages"][-1].content
 
-    await db.add_message(body.session_id, "assistant", reply)
+    asst_row = await db.add_message(body.session_id, "assistant", reply)
+    await rag.store_embedding(
+        user_row["id"], user_id, body.session_id, "user", body.message
+    )
+    await rag.store_embedding(
+        asst_row["id"], user_id, body.session_id, "assistant", reply
+    )
     return ChatResponse(session_id=body.session_id, reply=reply)
 
 
@@ -102,11 +118,14 @@ async def chat_stream(
     if not session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
 
-    await db.add_message(body.session_id, "user", body.message)
+    user_row = await db.add_message(body.session_id, "user", body.message)
     if not session.get("title"):
         snippet = " ".join(body.message.split())[:48].strip()
         await db.update_session_title(body.session_id, snippet or "New chat")
 
+    rag_context = await rag.retrieve_context(
+        user_id, body.message, body.session_id
+    )
     graph = await ensure_graph(request.app)
 
     async def gen():
@@ -114,7 +133,12 @@ async def chat_stream(
         try:
             async for chunk, _meta in graph.astream(
                 {"messages": [HumanMessage(body.message)]},
-                config={"configurable": {"thread_id": body.session_id}},
+                config={
+                    "configurable": {
+                        "thread_id": body.session_id,
+                        "rag_context": rag_context,
+                    }
+                },
                 stream_mode="messages",
             ):
                 if isinstance(chunk, AIMessageChunk):
@@ -129,8 +153,16 @@ async def chat_stream(
             # Persist whatever was generated (covers client-abort too).
             if full:
                 try:
-                    await db.add_message(
+                    asst_row = await db.add_message(
                         body.session_id, "assistant", full
+                    )
+                    await rag.store_embedding(
+                        user_row["id"], user_id, body.session_id,
+                        "user", body.message,
+                    )
+                    await rag.store_embedding(
+                        asst_row["id"], user_id, body.session_id,
+                        "assistant", full,
                     )
                 except Exception:  # noqa: BLE001
                     pass
