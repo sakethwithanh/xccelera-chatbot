@@ -23,7 +23,9 @@ export default function App() {
   const [initError, setInitError] = useState(null);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    typeof window === "undefined" || window.innerWidth > 760,
+  );
   const [titleOverrides, setTitleOverrides] = useState({});
   const [draft, setDraft] = useState("");
 
@@ -84,6 +86,7 @@ export default function App() {
     setActiveId(id);
     setDraft("");
     if (user) localStorage.setItem(lastKey(user.id), id);
+    if (window.innerWidth <= 760) setSidebarOpen(false);
   }
 
   function handleSend(textArg) {
@@ -128,6 +131,12 @@ export default function App() {
           onSignOut={signOut}
           user={user}
           creating={creating}
+        />
+      )}
+      {sidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 

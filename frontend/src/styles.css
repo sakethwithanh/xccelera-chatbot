@@ -100,7 +100,7 @@ input, textarea {
 .login-card {
   position: relative;
   z-index: 2;
-  width: 420px;
+  width: min(420px, calc(100vw - 28px));
   background: linear-gradient(180deg, rgba(20, 28, 48, 0.85), rgba(12, 18, 32, 0.85));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
@@ -348,7 +348,7 @@ input, textarea {
   background: var(--bg);
 }
 
-.chat-stage.no-sidebar { grid-template-columns: 0 1fr; }
+.chat-stage.no-sidebar { grid-template-columns: 1fr; }
 
 /* Sidebar */
 .sidebar {
@@ -960,8 +960,37 @@ input, textarea {
 
 /* responsive guards */
 @media (max-width: 760px) {
-  .chat-stage { grid-template-columns: 0 1fr; }
-  .sidebar { display: none; }
+  /* Single column; sidebar slides over content. */
+  .chat-stage,
+  .chat-stage.no-sidebar { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 82vw;
+    max-width: 300px;
+    z-index: 60;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 55;
+  }
+  .chat-header { padding: 0 14px; }
+  .msg-list { padding: 0 14px; }
+  .msg-body { max-width: 78vw; }
+  .composer-wrap { padding: 12px 12px 16px; }
+  .empty-title { font-size: 22px; }
+  .prompt-grid { grid-template-columns: 1fr; }
+}
+
+/* Desktop: no stray backdrop */
+.sidebar-backdrop { display: none; }
+@media (max-width: 760px) {
+  .sidebar-backdrop { display: block; }
 }
 
 /* ───────── App additions (real-app states) ───────── */
