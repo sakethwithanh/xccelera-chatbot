@@ -99,8 +99,12 @@ async def retrieve_context(
     if not rows:
         return ""
 
-    lines = [f"- ({r['role']}) {r['content']}" for r in rows]
+    # Newest first so the model can prefer recent facts on conflict.
+    rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    lines = [f"- {r['content']}" for r in rows]
     return (
-        "Relevant context from this user's earlier conversations "
-        "(other chats). Use only if relevant:\n" + "\n".join(lines)
+        "The user said the following in earlier chats, ordered "
+        "MOST RECENT FIRST. If statements conflict (e.g. a fact was "
+        "updated), trust the most recent one. Use only if relevant:\n"
+        + "\n".join(lines)
     )

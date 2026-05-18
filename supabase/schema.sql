@@ -94,11 +94,14 @@ create or replace function public.match_user_messages(
     p_exclude_session uuid,
     match_count int
 )
-returns table (role text, content text, similarity float)
+returns table (
+    role text, content text, similarity float, created_at timestamptz
+)
 language sql stable
 as $$
     select e.role, e.content,
-           1 - (e.embedding <=> query_embedding) as similarity
+           1 - (e.embedding <=> query_embedding) as similarity,
+           e.created_at
     from public.message_embeddings e
     where e.user_id = p_user_id
       and (p_exclude_session is null or e.session_id <> p_exclude_session)
