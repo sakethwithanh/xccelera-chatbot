@@ -20,16 +20,28 @@ MIN_SIMILARITY = 0.6
 
 
 @lru_cache
-def _embeddings() -> GoogleGenerativeAIEmbeddings:
-    return GoogleGenerativeAIEmbeddings(
-        model=EMBED_MODEL,
-        google_api_key=get_settings().gemini_api_key,
-        output_dimensionality=EMBED_DIM,
+def _embedders() -> tuple:
+    return tuple(
+        GoogleGenerativeAIEmbeddings(
+            model=EMBED_MODEL,
+            google_api_key=k,
+            output_dimensionality=EMBED_DIM,
+        )
+        for k in get_settings().gemini_keys
     )
 
 
 async def embed(text: str) -> list[float]:
-    return await _embeddings().aembed_query(text)
+    embedders = _embedders()
+    last_exc = None
+    for i, e in enumerate(embedders):
+        try:
+            return await e.aembed_query(text)
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if i + 1 < len(embedders):
+                print(f"[embed] key {i} failed, trying fallback: {exc!r}")
+    raise last_exc
 
 
 async def store_embedding(

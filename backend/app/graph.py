@@ -21,19 +21,20 @@ SYSTEM_PROMPT = (
 )
 
 
-def _make_llm() -> ChatGoogleGenerativeAI:
+def _make_llms() -> list[ChatGoogleGenerativeAI]:
     s = get_settings()
-    return ChatGoogleGenerativeAI(
-        model=s.gemini_model,
-        google_api_key=s.gemini_api_key,
-        temperature=0.7,
-    )
+    return [
+        ChatGoogleGenerativeAI(
+            model=s.gemini_model, google_api_key=k, temperature=0.7
+        )
+        for k in s.gemini_keys
+    ]
 
 
 def build_graph(checkpointer):
     """Compile the conversation graph bound to a checkpointer."""
     settings = get_settings()
-    llm = _make_llm()
+    llms = _make_llms()  # [primary, fallback?]
 
     async def call_model(state: MessagesState, config) -> dict:
         # Full history lives in the checkpointer; cap what we send to the
@@ -44,8 +45,17 @@ def build_graph(checkpointer):
         if rag:
             prompt.append(SystemMessage(rag))
         prompt.extend(history)
-        response = await llm.ainvoke(prompt)
-        return {"messages": [response]}
+        # Try primary key, fall back to spare on failure (free-tier quota).
+        last_exc = None
+        for i, llm in enumerate(llms):
+            try:
+                response = await llm.ainvoke(prompt)
+                return {"messages": [response]}
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if i + 1 < len(llms):
+                    print(f"[gemini] key {i} failed, trying fallback: {exc!r}")
+        raise last_exc
 
     builder = StateGraph(MessagesState)
     builder.add_node("model", call_model)

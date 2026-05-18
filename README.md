@@ -19,6 +19,13 @@ Built for the Xccelera AI assignment.
 
 ---
 
+## Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — full system docs + detailed
+  diagrams (system, request lifecycle, auth, RAG, LangGraph, data model ERD,
+  concurrency, CI/CD, scaling, security).
+- [FLOW.md](FLOW.md) — quick flow diagrams.
+
 ## Architecture
 
 ```

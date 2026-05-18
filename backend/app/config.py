@@ -9,7 +9,15 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: str
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_api_key_fallback: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
+    @property
+    def gemini_keys(self) -> list[str]:
+        keys = [self.gemini_api_key]
+        if self.gemini_api_key_fallback:
+            keys.append(self.gemini_api_key_fallback)
+        return keys
 
     supabase_url: str
     supabase_service_key: str
