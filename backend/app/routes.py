@@ -84,12 +84,11 @@ async def chat(
     )
     reply = result["messages"][-1].content
 
-    asst_row = await db.add_message(body.session_id, "assistant", reply)
+    await db.add_message(body.session_id, "assistant", reply)
+    # Embed user turns only — they carry the facts/topics worth recalling;
+    # assistant text adds noise (e.g. refusals) to similarity search.
     await rag.store_embedding(
         user_row["id"], user_id, body.session_id, "user", body.message
-    )
-    await rag.store_embedding(
-        asst_row["id"], user_id, body.session_id, "assistant", reply
     )
     return ChatResponse(session_id=body.session_id, reply=reply)
 
@@ -153,16 +152,13 @@ async def chat_stream(
             # Persist whatever was generated (covers client-abort too).
             if full:
                 try:
-                    asst_row = await db.add_message(
+                    await db.add_message(
                         body.session_id, "assistant", full
                     )
+                    # User turns only (see /chat note).
                     await rag.store_embedding(
                         user_row["id"], user_id, body.session_id,
                         "user", body.message,
-                    )
-                    await rag.store_embedding(
-                        asst_row["id"], user_id, body.session_id,
-                        "assistant", full,
                     )
                 except Exception:  # noqa: BLE001
                     pass

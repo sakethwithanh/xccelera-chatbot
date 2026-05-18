@@ -15,8 +15,8 @@ from .db import _client
 
 EMBED_MODEL = "models/gemini-embedding-001"
 EMBED_DIM = 768  # must match message_embeddings.embedding vector(768)
-TOP_K = 4
-MIN_SIMILARITY = 0.65
+TOP_K = 6
+MIN_SIMILARITY = 0.6
 
 
 @lru_cache
