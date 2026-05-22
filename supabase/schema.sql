@@ -108,3 +108,24 @@ as $$
     order by e.embedding <=> query_embedding
     limit match_count;
 $$;
+
+-- ---- AI News -------------------------------------------------------------
+create table if not exists public.news_articles (
+    id           uuid primary key default gen_random_uuid(),
+    title        text not null,
+    url          text not null unique,
+    source       text,
+    summary      text,
+    content      text,
+    published_at timestamptz,
+    created_at   timestamptz not null default now()
+);
+alter table public.news_articles enable row level security;
+drop policy if exists "news read" on public.news_articles;
+create policy "news read" on public.news_articles
+    for select to authenticated using (true);
+
+-- Sessions can be anchored to a news article (chat grounded in it).
+alter table public.sessions
+    add column if not exists news_article_id uuid
+        references public.news_articles (id) on delete set null;

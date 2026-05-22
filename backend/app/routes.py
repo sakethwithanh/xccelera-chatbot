@@ -1,21 +1,45 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
-from . import db, rag
+from . import db, news, rag
 from .auth import current_user_id
+from .config import get_settings
 from .runtime import ensure_graph
 from .schemas import (
     ChatRequest,
     ChatResponse,
     MessageOut,
+    NewsOut,
     SessionCreate,
     SessionOut,
 )
 
 router = APIRouter(prefix="/api")
+
+
+async def _article_block(session: dict) -> str:
+    """Context block when a session is anchored to a news article."""
+    aid = session.get("news_article_id")
+    if not aid:
+        return ""
+    art = await db.get_article(aid)
+    if not art:
+        return ""
+    return (
+        "The user is discussing this news article. Ground your answers in "
+        "it:\n"
+        f"Title: {art['title']}\n"
+        f"Source: {art.get('source')}\n"
+        f"URL: {art['url']}\n"
+        f"Summary: {art.get('summary') or art.get('content')}"
+    )
+
+
+def _merge_context(article_block: str, rag_context: str) -> str:
+    return "\n\n".join(b for b in (article_block, rag_context) if b)
 
 
 @router.get("/health")
@@ -69,6 +93,7 @@ async def chat(
     rag_context = await rag.retrieve_context(
         user_id, body.message, body.session_id
     )
+    rag_context = _merge_context(await _article_block(session), rag_context)
 
     # LangGraph: thread_id == session_id. The checkpointer loads prior state
     # for this thread, so the model answers with full conversation context.
@@ -125,6 +150,7 @@ async def chat_stream(
     rag_context = await rag.retrieve_context(
         user_id, body.message, body.session_id
     )
+    rag_context = _merge_context(await _article_block(session), rag_context)
     graph = await ensure_graph(request.app)
 
     async def gen():
@@ -168,3 +194,30 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---- AI News -------------------------------------------------------------
+
+
+@router.get("/news", response_model=list[NewsOut])
+async def get_news(_user_id: str = Depends(current_user_id)) -> list[dict]:
+    return await db.list_news()
+
+
+@router.post("/news/refresh")
+async def refresh_news(x_cron_secret: str | None = Header(default=None)) -> dict:
+    secret = get_settings().cron_secret
+    if not secret or x_cron_secret != secret:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad cron secret")
+    return await news.refresh()
+
+
+@router.post("/news/{article_id}/discuss", response_model=SessionOut)
+async def discuss_article(
+    article_id: str, user_id: str = Depends(current_user_id)
+) -> dict:
+    art = await db.get_article(article_id)
+    if not art:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Article not found")
+    title = ("News: " + art["title"])[:60]
+    return await db.create_session(user_id, title, news_article_id=article_id)

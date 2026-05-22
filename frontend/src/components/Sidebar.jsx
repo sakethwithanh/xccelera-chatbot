@@ -33,6 +33,8 @@ export default function Sidebar({
   onSignOut,
   user,
   creating,
+  view,
+  onShowNews,
 }) {
   const meta = user?.user_metadata || {};
   const displayName = meta.full_name || user?.email?.split("@")[0] || "User";
@@ -64,6 +66,13 @@ export default function Sidebar({
 
       <button className="new-chat-btn" onClick={onNew} disabled={creating}>
         <Icon.plus /> New chat
+      </button>
+
+      <button
+        className={`nav-item${view === "news" ? " active" : ""}`}
+        onClick={onShowNews}
+      >
+        <Icon.news /> AI News
       </button>
 
       <div className="sidebar-search">

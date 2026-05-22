@@ -91,6 +91,12 @@ export const Icon = {
       <path d="M18.5 5.5a9 9 0 0 1 0 13" />
     </svg>
   ),
+  news: (p) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+      <path d="M18 14h-8M15 18h-5M10 6h8v4h-8V6Z" />
+    </svg>
+  ),
   spark: (p) => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
       <path d="M12 3 13.4 9 19 10.5 13.4 12 12 18l-1.4-6L5 10.5 10.6 9 12 3Z" />

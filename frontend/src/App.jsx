@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import ChatMain from "./components/ChatMain";
 import Login from "./components/Login";
+import NewsPage from "./components/NewsPage";
 import Sidebar from "./components/Sidebar";
 import { useAuth } from "./contexts/AuthContext";
 import { useChat } from "./hooks/useChat";
@@ -28,6 +29,7 @@ export default function App() {
   );
   const [titleOverrides, setTitleOverrides] = useState({});
   const [draft, setDraft] = useState("");
+  const [view, setView] = useState("chat"); // "chat" | "news"
 
   const { messages, sending, error, sendMessage, stop } = useChat(activeId);
 
@@ -85,7 +87,17 @@ export default function App() {
   function select(id) {
     setActiveId(id);
     setDraft("");
+    setView("chat");
     if (user) localStorage.setItem(lastKey(user.id), id);
+    if (window.innerWidth <= 760) setSidebarOpen(false);
+  }
+
+  function onDiscuss(session) {
+    setSessions((prev) => [session, ...prev]);
+    setActiveId(session.id);
+    setDraft("");
+    setView("chat");
+    if (user) localStorage.setItem(lastKey(user.id), session.id);
     if (window.innerWidth <= 760) setSidebarOpen(false);
   }
 
@@ -131,6 +143,11 @@ export default function App() {
           onSignOut={signOut}
           user={user}
           creating={creating}
+          view={view}
+          onShowNews={() => {
+            setView("news");
+            if (window.innerWidth <= 760) setSidebarOpen(false);
+          }}
         />
       )}
       {sidebarOpen && (
@@ -140,7 +157,13 @@ export default function App() {
         />
       )}
 
-      {!ready ? (
+      {view === "news" ? (
+        <NewsPage
+          sidebarOpen={sidebarOpen}
+          onShowSidebar={() => setSidebarOpen(true)}
+          onDiscuss={onDiscuss}
+        />
+      ) : !ready ? (
         <div className="app-loader" style={{ position: "static" }}>
           Loading conversation…
         </div>

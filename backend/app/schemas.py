@@ -29,3 +29,12 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
+
+
+class NewsOut(BaseModel):
+    id: str
+    title: str
+    url: str
+    source: str | None
+    summary: str | None
+    published_at: datetime | None

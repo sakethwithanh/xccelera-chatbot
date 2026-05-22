@@ -38,6 +38,9 @@ export const api = {
     }),
   listMessages: (sessionId) =>
     request(`/api/sessions/${sessionId}/messages`),
+  listNews: () => request("/api/news"),
+  discussArticle: (articleId) =>
+    request(`/api/news/${articleId}/discuss`, { method: "POST" }),
   sendChat: (sessionId, message) =>
     request("/api/chat", {
       method: "POST",
