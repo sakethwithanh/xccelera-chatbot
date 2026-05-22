@@ -204,10 +204,20 @@ async def get_news(_user_id: str = Depends(current_user_id)) -> list[dict]:
     return await db.list_news()
 
 
-@router.post("/news/refresh")
-async def refresh_news(x_cron_secret: str | None = Header(default=None)) -> dict:
+# GET + POST: Vercel Cron calls GET with `Authorization: Bearer $CRON_SECRET`
+# (auto-injected); manual/curl can use POST with `x-cron-secret`.
+@router.api_route("/news/refresh", methods=["GET", "POST"])
+async def refresh_news(
+    x_cron_secret: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> dict:
     secret = get_settings().cron_secret
-    if not secret or x_cron_secret != secret:
+    bearer = (
+        authorization.removeprefix("Bearer ").strip()
+        if authorization
+        else None
+    )
+    if not secret or (x_cron_secret != secret and bearer != secret):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad cron secret")
     return await news.refresh()
 
