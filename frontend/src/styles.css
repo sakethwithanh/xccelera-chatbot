@@ -1651,3 +1651,31 @@ html, body, #root { height: 100%; }
 .brand .mark.has-img { border-radius: 10px; }
 .brand-large .mark.has-img { border-radius: 14px; }
 .ava.ai { border-radius: 12px; }
+
+/* ===== Mobile responsive polish (≤640px) ===== */
+@media (max-width: 640px) {
+  .conv { padding: 20px 12px 180px !important; }
+  .composer-wrap { padding: 14px 12px 16px; }
+  .composer-pill, .composer { max-width: 100% !important; border-radius: 22px; }
+  .bubble-col { max-width: 92% !important; }
+  .conv-head { padding: 12px 14px; gap: 8px; }
+  .conv-head h1 { font-size: 15px; }
+  .conv-head .pill { font-size: 10.5px; padding: 4px 8px; }
+  .news-head { padding: 18px 16px 14px; }
+  .head-top h1 { font-size: 28px; }
+  .stat-row { gap: 8px; }
+  .stat { min-width: 86px; padding: 10px 12px; }
+  .feed { padding: 18px 14px 60px; }
+  .hero-row { gap: 14px; }
+  .feature-hero, .secondary, .news-card { padding: 18px; }
+  .feature-hero h2 { font-size: 22px; }
+  .grid { gap: 14px; }
+  .empty-conv { padding: 24px 16px; }
+  .empty-conv h2 { font-size: 28px; }
+  .settings-card { padding: 18px; }
+}
+
+/* Tablet sidebar — switch to overlay below 880 (already in design); keep app comfy */
+@media (max-width: 880px) {
+  .app .main { margin: 8px; }
+}

@@ -97,10 +97,13 @@ export default function Login() {
             </div>
 
             <div className="testimonial">
-              <p>“Axis replaced four tabs and three rituals. It just <em>knows</em>.”</p>
+              <p>
+                Built on <em>LangGraph</em> + <em>Gemini</em> + <em>Supabase</em>.
+                Conversations, cross-chat memory and a daily AI news feed —
+                all in one workspace.
+              </p>
               <div className="who">
-                <span className="ava" aria-hidden="true" />
-                <span>Mira Okafor · Head of Research, Halcyon Labs</span>
+                <span>OPEN ABOUT HOW IT WORKS</span>
               </div>
             </div>
           </div>
