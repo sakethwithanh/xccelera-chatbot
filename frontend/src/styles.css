@@ -1697,3 +1697,25 @@ html, body, #root { height: auto; min-height: 100%; overflow: visible; }
   .auth-card { padding: 24px !important; }
   .legal { position: static !important; padding: 20px 12px 12px; }
 }
+
+/* Mobile: make sidebar toggle obvious + cards readable over blob bg */
+@media (max-width: 880px) {
+  .conv-head .icon-btn,
+  .news-head .icon-btn {
+    width: 40px; height: 40px;
+    color: var(--c-cyan) !important;
+    background: rgba(120, 200, 240, 0.1) !important;
+    border: 1px solid rgba(120, 200, 240, 0.45) !important;
+    box-shadow: 0 0 14px -4px rgba(120, 200, 240, 0.5);
+  }
+}
+.empty-conv h2,
+.empty-conv p { text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55); }
+.empty-conv .suggest button {
+  background: rgba(10, 14, 28, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+.empty-conv .suggest button .arr { color: var(--ink-2) !important; }
