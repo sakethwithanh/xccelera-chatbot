@@ -189,6 +189,9 @@ export default function NewsPage({ sidebarOpen, onShowSidebar, onDiscuss }) {
                   <div className="foot-row">
                     <DiscussBtn a={a} />
                     <Audio a={a} small />
+                    <a className="save-btn" href={a.url} target="_blank" rel="noreferrer" title="Open source">
+                      <Icon.arrow width="14" height="14" />
+                    </a>
                   </div>
                 </article>
               ))}
@@ -215,6 +218,9 @@ export default function NewsPage({ sidebarOpen, onShowSidebar, onDiscuss }) {
                   <div className="foot-row">
                     <DiscussBtn a={a} />
                     <Audio a={a} small />
+                    <a className="save-btn" href={a.url} target="_blank" rel="noreferrer" title="Open source">
+                      <Icon.arrow width="14" height="14" />
+                    </a>
                   </div>
                 </article>
               ))}
