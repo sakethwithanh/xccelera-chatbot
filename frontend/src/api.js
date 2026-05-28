@@ -41,6 +41,14 @@ export const api = {
   listNews: () => request("/api/news"),
   discussArticle: (articleId) =>
     request(`/api/news/${articleId}/discuss`, { method: "POST" }),
+  getSettings: () => request("/api/settings"),
+  putSettings: (gemini_api_key) =>
+    request("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ gemini_api_key }),
+    }),
+  deleteSettings: () => request("/api/settings", { method: "DELETE" }),
+  getUsage: () => request("/api/usage"),
   sendChat: (sessionId, message) =>
     request("/api/chat", {
       method: "POST",

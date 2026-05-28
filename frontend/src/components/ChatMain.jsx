@@ -6,122 +6,108 @@ import Composer from "./Composer";
 import { Icon } from "./icons";
 
 const SUGGESTED = [
-  {
-    cat: "Get started",
-    text: "What can you do, and how do you stay in context across our chat?",
-    hint: "Explains the assistant",
-  },
-  {
-    cat: "Brainstorm",
-    text: "Brainstorm 5 product name ideas for a privacy-first note-taking app",
-    hint: "Creative ideation",
-  },
-  {
-    cat: "Write",
-    text: "Draft a polite follow-up email after a job interview",
-    hint: "Drafting & tone",
-  },
-  {
-    cat: "Learn",
-    text: "Explain how vector embeddings work, in simple terms",
-    hint: "Plain-English explainer",
-  },
+  "What can you do, and how do you stay in context across our chats?",
+  "Brainstorm 5 product name ideas for a privacy-first note-taking app",
+  "Draft a polite follow-up email after a job interview",
+  "Explain how vector embeddings work, in simple terms",
 ];
 
-function Message({ msg, speech }) {
-  if (msg.role === "user") {
-    return (
-      <div className="msg user">
-        <div className="msg-body">
-          <div className="msg-bubble">{msg.content}</div>
-        </div>
-      </div>
-    );
-  }
+function Message({ msg, initials, speech }) {
+  const me = msg.role === "user";
   const speaking = speech.speakingId === msg.id;
   return (
-    <div className="msg bot">
-      <div className="bot-avatar">
-        <Icon.spark style={{ width: 16, height: 16, color: "#fff" }} />
+    <div className={`msg${me ? " me" : ""}`}>
+      <div className={`ava ${me ? "me" : "ai"}`} aria-hidden="true">
+        {me ? initials : <img src="/axis-icon.png" alt="" className="ava-img" />}
       </div>
-      <div className="msg-body">
-        <div className="msg-bubble markdown">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              a: (props) => (
-                <a {...props} target="_blank" rel="noreferrer" />
-              ),
-            }}
-          >
-            {msg.content}
-          </ReactMarkdown>
+      <div className="bubble-col">
+        <div className="meta-row">
+          <span>{me ? "You" : "Axis"}</span>
+          {!me && <span className="model">axis · context-aware</span>}
         </div>
-        <div className="msg-actions">
-          <button
-            className="msg-action"
-            title="Copy"
-            onClick={() => navigator.clipboard?.writeText(msg.content)}
-          >
-            <Icon.copy />
-          </button>
-          {speech.supported && (
-            <button
-              className={`msg-action${speaking ? " on" : ""}`}
-              title={speaking ? "Stop" : "Read aloud"}
-              onClick={() => speech.speak(msg.id, msg.content)}
+        <div className={`bubble ${me ? "me" : "ai"}`}>
+          {me ? (
+            msg.content
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: (pr) => <a {...pr} target="_blank" rel="noreferrer" />,
+              }}
             >
-              {speaking ? <Icon.stopSquare /> : <Icon.volume />}
-            </button>
+              {msg.content}
+            </ReactMarkdown>
           )}
         </div>
+        {!me && (
+          <div className="bubble-actions">
+            <button
+              className="b-action"
+              title="Copy"
+              onClick={() => navigator.clipboard?.writeText(msg.content)}
+            >
+              <Icon.copy width="14" height="14" />
+            </button>
+            {speech.supported && (
+              <button
+                className="b-action"
+                title={speaking ? "Stop" : "Read aloud"}
+                onClick={() => speech.speak(msg.id, msg.content)}
+                style={speaking ? { color: "var(--c-cyan)" } : undefined}
+              >
+                {speaking ? (
+                  <Icon.stop width="13" height="13" />
+                ) : (
+                  <Icon.volume width="14" height="14" />
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ThinkingBubble() {
+function Typing() {
   return (
-    <div className="msg bot">
-      <div className="bot-avatar">
-        <Icon.spark style={{ width: 16, height: 16, color: "#fff" }} />
+    <div className="msg">
+      <div className="ava ai" aria-hidden="true">
+        <img src="/axis-icon.png" alt="" className="ava-img" />
       </div>
-      <div className="msg-body">
-        <div
-          className="msg-bubble"
-          style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--muted)" }}
-        >
-          <div>
-            <span className="typing-dot" />
-            <span className="typing-dot" />
-            <span className="typing-dot" />
-          </div>
-          <span style={{ fontSize: 12.5 }}>Thinking with full context…</span>
+      <div className="bubble-col">
+        <div className="meta-row">
+          <span>Axis</span> <span className="model">thinking…</span>
+        </div>
+        <div className="bubble ai">
+          <span className="typing">
+            <span />
+            <span />
+            <span />
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-function EmptyState({ onPick, userName }) {
+function EmptyConv({ onPick, userName }) {
   return (
-    <div className="empty-stage">
-      <div className="empty-mark">
-        <Icon.spark style={{ width: 28, height: 28, color: "#fff" }} />
+    <div className="empty-conv">
+      <div className="ava ai big" aria-hidden="true">
+        <img src="/axis-icon.png" alt="" className="ava-img big" />
       </div>
-      <h2 className="empty-title">
-        {userName ? `Hi ${userName} — how can Axis help?` : "How can Axis help you today?"}
+      <h2>
+        Hi {userName || "there"}, how can <em>Axis</em> help?
       </h2>
-      <p className="empty-sub">
-        I remember everything you say in this conversation and answer with full
-        context. Ask me anything to get started.
+      <p className="muted">
+        I remember everything you say in this conversation — and recall what you
+        told me in other chats too.
       </p>
-      <div className="prompt-grid">
-        {SUGGESTED.map((p, i) => (
-          <button key={i} className="prompt-card" onClick={() => onPick(p.text)}>
-            <span className="pc-cat">{p.cat}</span>
-            <span className="pc-text">{p.text}</span>
-            <span className="pc-hint">{p.hint}</span>
+      <div className="suggest">
+        {SUGGESTED.map((t, i) => (
+          <button key={i} onClick={() => onPick(t)}>
+            {t}
           </button>
         ))}
       </div>
@@ -144,56 +130,48 @@ export default function ChatMain({
 }) {
   const scrollRef = useRef(null);
   const speech = useSpeechSynthesis();
+  const initials = (userName || "U").slice(0, 2).toUpperCase();
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
   }, [messages, sending]);
 
-  const lastAssistant = [...messages]
-    .reverse()
-    .find((m) => m.role === "assistant");
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
   const awaitingFirstToken = !lastAssistant || lastAssistant.content === "";
+  const empty = messages.length === 0 && !sending;
 
   return (
-    <main className="chat-main">
-      <header className="chat-header">
+    <section className="main">
+      <header className="conv-head">
         {!sidebarOpen && (
-          <button
-            className="icon-btn"
-            onClick={onShowSidebar}
-            title="Show sidebar"
-          >
-            <Icon.sidebar />
+          <button className="icon-btn" onClick={onShowSidebar} aria-label="Sidebar">
+            <Icon.sidebar width="14" height="14" />
           </button>
         )}
-        <div className="chat-header-title">
-          <span className="h-title">{title}</span>
-          <span className="h-pill">
-            <span className="ping" /> Context-aware
+        <div className="title-row">
+          <h1>{title}</h1>
+          <span className="pill">
+            <span className="dot" /> Context-aware · Axis
           </span>
         </div>
       </header>
 
-      {messages.length === 0 && !sending ? (
-        <EmptyState onPick={(t) => onSend(t)} userName={userName} />
-      ) : (
-        <div className="chat-scroll" ref={scrollRef}>
-          <div className="msg-list">
+      <div className="conv scroll" ref={scrollRef}>
+        {empty ? (
+          <EmptyConv onPick={(t) => onSend(t)} userName={userName} />
+        ) : (
+          <>
             {messages
-              .filter(
-                (m) => !(m.role === "assistant" && m.content === ""),
-              )
+              .filter((m) => !(m.role === "assistant" && m.content === ""))
               .map((m) => (
-                <Message key={m.id} msg={m} speech={speech} />
+                <Message key={m.id} msg={m} initials={initials} speech={speech} />
               ))}
-            {sending && awaitingFirstToken && <ThinkingBubble />}
-          </div>
-        </div>
-      )}
-
-      {error && <div className="chat-error">{error}</div>}
+            {sending && awaitingFirstToken && <Typing />}
+            {error && <div className="conv-error">{error}</div>}
+          </>
+        )}
+      </div>
 
       <Composer
         value={draft}
@@ -203,6 +181,6 @@ export default function ChatMain({
         streaming={sending}
         disabled={sending}
       />
-    </main>
+    </section>
   );
 }

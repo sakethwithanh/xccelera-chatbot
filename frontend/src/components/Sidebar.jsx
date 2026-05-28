@@ -9,14 +9,14 @@ function startOfDay(d) {
 function groupSessions(sessions) {
   const today = startOfDay(new Date());
   const dayMs = 86400000;
-  const groups = { Today: [], Yesterday: [], "Last 7 days": [], Older: [] };
+  const groups = { Today: [], Yesterday: [], "Last 7 days": [], Earlier: [] };
   for (const s of sessions) {
     const created = startOfDay(s.created_at);
     const diff = Math.round((today - created) / dayMs);
     if (diff <= 0) groups.Today.push(s);
     else if (diff === 1) groups.Yesterday.push(s);
     else if (diff <= 7) groups["Last 7 days"].push(s);
-    else groups.Older.push(s);
+    else groups.Earlier.push(s);
   }
   return Object.entries(groups).filter(([, v]) => v.length > 0);
 }
@@ -35,6 +35,7 @@ export default function Sidebar({
   creating,
   view,
   onShowNews,
+  onShowSettings,
 }) {
   const meta = user?.user_metadata || {};
   const displayName = meta.full_name || user?.email?.split("@")[0] || "User";
@@ -53,30 +54,36 @@ export default function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-head">
-        <img className="sidebar-logo" src="/logo.webp" alt="Xccelera" />
-        <button
-          className="sidebar-collapse"
-          onClick={onCollapse}
-          title="Collapse sidebar"
-        >
-          <Icon.sidebar />
+      <div className="brand">
+        <div className="mark has-img" aria-hidden="true">
+          <img src="/axis-icon.png" alt="" />
+        </div>
+        <div className="wordmark">
+          <em>A</em>xis
+        </div>
+        <button className="toggle" onClick={onCollapse} aria-label="Collapse">
+          <Icon.sidebar width="14" height="14" />
         </button>
       </div>
 
-      <button className="new-chat-btn" onClick={onNew} disabled={creating}>
-        <Icon.plus /> New chat
-      </button>
-
-      <button
+      <a
         className={`nav-item${view === "news" ? " active" : ""}`}
         onClick={onShowNews}
+        style={{ cursor: "pointer" }}
       >
-        <Icon.news /> AI News
+        <span className="ico">
+          <Icon.news width="16" height="16" />
+        </span>
+        AI News
+      </a>
+
+      <button className="new-chat" onClick={onNew} disabled={creating}>
+        <Icon.plus width="14" height="14" />
+        New chat
       </button>
 
-      <div className="sidebar-search">
-        <Icon.search />
+      <div className="search">
+        <Icon.search width="14" height="14" />
         <input
           placeholder="Search chats…"
           value={search}
@@ -84,37 +91,46 @@ export default function Sidebar({
         />
       </div>
 
-      <div className="sidebar-scroll">
+      <div className="chats">
         {grouped.length === 0 && (
-          <div className="sidebar-empty">
-            {q ? "No chats match your search." : "No conversations yet."}
+          <div className="group-label">
+            {q ? "No matches" : "No conversations yet"}
           </div>
         )}
         {grouped.map(([group, items]) => (
           <div key={group}>
-            <div className="sidebar-section">{group}</div>
+            <div className="group-label">{group}</div>
             {items.map((c) => (
-              <button
+              <div
                 key={c.id}
-                className={`conv-item${c.id === activeId ? " active" : ""}`}
+                className={`chat-item${c.id === activeId ? " active" : ""}`}
                 onClick={() => onSelect(c.id)}
               >
-                <span className="conv-title">{titleFor(c)}</span>
-                {c.id === activeId && <span className="conv-dot" />}
-              </button>
+                <span className="label">{titleFor(c)}</span>
+                {c.id === activeId && <span className="indicator" />}
+              </div>
             ))}
           </div>
         ))}
       </div>
 
       <div className="user-card">
-        <div className="user-avatar">{initials}</div>
-        <div className="user-info">
-          <div className="user-name">{displayName}</div>
-          <div className="user-plan">{user?.email}</div>
+        <div className="avatar">{initials}</div>
+        <div className="meta">
+          <div className="name">{displayName}</div>
+          <div className="mail">{user?.email}</div>
         </div>
-        <button className="icon-btn" title="Sign out" onClick={onSignOut}>
-          <Icon.logout />
+        <button
+          className="out"
+          onClick={onShowSettings}
+          aria-label="Settings"
+          title="Settings"
+          style={view === "settings" ? { color: "var(--c-cyan)", borderColor: "rgba(120,200,240,0.4)" } : undefined}
+        >
+          <Icon.gear width="14" height="14" />
+        </button>
+        <button className="out" onClick={onSignOut} aria-label="Sign out">
+          <Icon.logout width="14" height="14" />
         </button>
       </div>
     </aside>

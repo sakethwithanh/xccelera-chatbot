@@ -162,6 +162,104 @@ async def get_article(article_id: str) -> dict | None:
     return await asyncio.to_thread(_call)
 
 
+async def update_article_content(article_id: str, content: str) -> None:
+    def _call() -> None:
+        (
+            _client()
+            .table("news_articles")
+            .update({"content": content})
+            .eq("id", article_id)
+            .execute()
+        )
+
+    await asyncio.to_thread(_call)
+
+
+# ---- Per-user settings + usage --------------------------------------------
+
+
+async def get_user_settings(user_id: str) -> dict | None:
+    def _call() -> dict | None:
+        res = (
+            _client()
+            .table("user_settings")
+            .select("gemini_api_key, updated_at")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    return await asyncio.to_thread(_call)
+
+
+async def upsert_user_settings(user_id: str, gemini_api_key: str | None) -> dict:
+    def _call() -> dict:
+        from datetime import datetime, timezone
+
+        res = (
+            _client()
+            .table("user_settings")
+            .upsert(
+                {
+                    "user_id": user_id,
+                    "gemini_api_key": gemini_api_key,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .execute()
+        )
+        return res.data[0]
+
+    return await asyncio.to_thread(_call)
+
+
+async def get_usage(user_id: str) -> dict:
+    def _call() -> dict:
+        res = (
+            _client()
+            .table("user_usage")
+            .select("free_messages_used")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if res.data:
+            return res.data[0]
+        # initialize row
+        _client().table("user_usage").insert(
+            {"user_id": user_id, "free_messages_used": 0}
+        ).execute()
+        return {"free_messages_used": 0}
+
+    return await asyncio.to_thread(_call)
+
+
+async def increment_usage(user_id: str) -> int:
+    def _call() -> int:
+        cur = (
+            _client()
+            .table("user_usage")
+            .select("free_messages_used")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        used = cur.data[0]["free_messages_used"] if cur.data else 0
+        used += 1
+        if cur.data:
+            _client().table("user_usage").update(
+                {"free_messages_used": used}
+            ).eq("user_id", user_id).execute()
+        else:
+            _client().table("user_usage").insert(
+                {"user_id": user_id, "free_messages_used": used}
+            ).execute()
+        return used
+
+    return await asyncio.to_thread(_call)
+
+
 async def upsert_articles(rows: list[dict]) -> int:
     if not rows:
         return 0

@@ -68,23 +68,28 @@ export function useSpeechRecognition(onResult) {
 // Text-to-speech. One utterance at a time; speak() toggles per id.
 export function useSpeechSynthesis() {
   const [speakingId, setSpeakingId] = useState(null);
+  const uttRef = useRef(null); // keep a ref so the utterance isn't GC'd
   const supported =
     typeof window !== "undefined" && "speechSynthesis" in window;
 
   const speak = useCallback(
     (id, text) => {
       if (!supported) return;
-      window.speechSynthesis.cancel();
-      if (speakingId === id) {
+      const synth = window.speechSynthesis;
+      const wasSpeaking = speakingId === id;
+      synth.cancel();
+      if (wasSpeaking) {
         setSpeakingId(null);
         return;
       }
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(String(text).slice(0, 4000));
       u.rate = 1;
       u.onend = () => setSpeakingId(null);
       u.onerror = () => setSpeakingId(null);
+      uttRef.current = u; // hold reference (Chrome/Brave GC bug)
       setSpeakingId(id);
-      window.speechSynthesis.speak(u);
+      // cancel() is async; defer speak so it actually starts.
+      setTimeout(() => synth.speak(u), 60);
     },
     [supported, speakingId],
   );

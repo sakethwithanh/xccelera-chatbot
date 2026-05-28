@@ -3,7 +3,10 @@ import { api } from "./api";
 import ChatMain from "./components/ChatMain";
 import Login from "./components/Login";
 import NewsPage from "./components/NewsPage";
+import ResetPassword from "./components/ResetPassword";
+import Settings from "./components/Settings";
 import Sidebar from "./components/Sidebar";
+import World from "./components/World";
 import { useAuth } from "./contexts/AuthContext";
 import { useChat } from "./hooks/useChat";
 
@@ -17,7 +20,7 @@ function snippet(text) {
 }
 
 export default function App() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, recovery } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [ready, setReady] = useState(false);
@@ -126,10 +129,13 @@ export default function App() {
     return <div className="app-loader">Loading…</div>;
   }
 
+  if (recovery) return <ResetPassword />;
   if (!user) return <Login />;
 
   return (
-    <div className={`chat-stage${sidebarOpen ? "" : " no-sidebar"}`}>
+    <>
+    <World />
+    <div className={`app${sidebarOpen ? "" : " no-sidebar"}`}>
       {sidebarOpen && (
         <Sidebar
           sessions={sessions}
@@ -148,6 +154,10 @@ export default function App() {
             setView("news");
             if (window.innerWidth <= 760) setSidebarOpen(false);
           }}
+          onShowSettings={() => {
+            setView("settings");
+            if (window.innerWidth <= 760) setSidebarOpen(false);
+          }}
         />
       )}
       {sidebarOpen && (
@@ -157,7 +167,12 @@ export default function App() {
         />
       )}
 
-      {view === "news" ? (
+      {view === "settings" ? (
+        <Settings
+          sidebarOpen={sidebarOpen}
+          onShowSidebar={() => setSidebarOpen(true)}
+        />
+      ) : view === "news" ? (
         <NewsPage
           sidebarOpen={sidebarOpen}
           onShowSidebar={() => setSidebarOpen(true)}
@@ -193,5 +208,6 @@ export default function App() {
         />
       )}
     </div>
+    </>
   );
 }

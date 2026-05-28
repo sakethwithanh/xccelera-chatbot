@@ -71,3 +71,23 @@ async def refresh() -> dict:
     rows = await asyncio.to_thread(_fetch_sync)
     inserted = await db.upsert_articles(rows)
     return {"fetched": len(rows), "inserted": inserted}
+
+
+def _extract_sync(url: str) -> str:
+    try:
+        import trafilatura
+
+        html = trafilatura.fetch_url(url)
+        if not html:
+            return ""
+        text = trafilatura.extract(
+            html, include_comments=False, include_tables=False
+        )
+        return (text or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+async def fetch_full_text(url: str) -> str:
+    """Best-effort main-content extraction from an article URL."""
+    return await asyncio.to_thread(_extract_sync, url)

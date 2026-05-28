@@ -38,3 +38,18 @@ class NewsOut(BaseModel):
     source: str | None
     summary: str | None
     published_at: datetime | None
+
+
+class SettingsIn(BaseModel):
+    gemini_api_key: str | None = Field(default=None, max_length=200)
+
+
+class SettingsOut(BaseModel):
+    has_key: bool
+    updated_at: datetime | None = None
+
+
+class UsageOut(BaseModel):
+    free_messages_used: int
+    free_limit: int
+    has_key: bool

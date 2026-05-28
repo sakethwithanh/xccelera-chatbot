@@ -17,9 +17,8 @@ export default function Composer({
   function autoresize(e) {
     onChange(e.target.value);
     e.target.style.height = "auto";
-    e.target.style.height = Math.min(200, e.target.scrollHeight) + "px";
+    e.target.style.height = Math.min(220, e.target.scrollHeight) + "px";
   }
-
   function onKey(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -29,78 +28,70 @@ export default function Composer({
       }
     }
   }
-
   function clickSend() {
     if (disabled || !value.trim()) return;
     onSend();
     if (taRef.current) taRef.current.style.height = "auto";
   }
 
-  function toggleMic() {
-    if (listening) stop();
-    else start();
-  }
-
   return (
     <div className="composer-wrap">
       <div className="composer">
-        <textarea
-          ref={taRef}
-          className="composer-input"
-          placeholder={
-            listening
-              ? "Listening… speak now"
-              : "Ask anything — Axis remembers this conversation…"
-          }
-          rows={1}
-          value={value}
-          onChange={autoresize}
-          onKeyDown={onKey}
-        />
-        <div className="composer-row">
+        <div className="input-row">
           {supported && (
             <button
-              className={`mic-btn${listening ? " listening" : ""}`}
-              onClick={toggleMic}
+              className={`mini-btn${listening ? " on" : ""}`}
+              onClick={() => (listening ? stop() : start())}
               disabled={disabled}
-              title={listening ? "Stop dictation" : "Voice input"}
+              aria-label="Voice"
               type="button"
             >
-              {listening ? <Icon.stopSquare /> : <Icon.mic />}
+              {listening ? <Icon.stop width="15" height="15" /> : <Icon.mic width="16" height="16" />}
             </button>
           )}
-          <span className="spacer" />
+          <textarea
+            ref={taRef}
+            placeholder={
+              listening
+                ? "Listening… speak now"
+                : "Ask Axis anything — your past chats are already in context…"
+            }
+            value={value}
+            onChange={autoresize}
+            onKeyDown={onKey}
+            rows={1}
+          />
           {streaming ? (
-            <button
-              className="send-btn stop"
-              onClick={onStop}
-              title="Stop generating"
-              type="button"
-            >
-              <Icon.stopSquare />
+            <button className="mini-btn stop-btn" onClick={onStop} aria-label="Stop" type="button">
+              <Icon.stop width="15" height="15" />
             </button>
           ) : (
             <button
-              className="send-btn"
+              className="mini-btn send"
               onClick={clickSend}
               disabled={disabled || !value.trim()}
-              title="Send"
+              aria-label="Send"
             >
-              <Icon.send />
+              <Icon.send width="16" height="16" />
             </button>
           )}
         </div>
+        <div className="util-row">
+          <span className="chip active">
+            <span className="dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--c-cyan)" }} />
+            Context-aware
+          </span>
+          <div className="right">
+            {error ? (
+              <span style={{ color: "var(--c-amber)" }}>{error}</span>
+            ) : (
+              <span>
+                <kbd>⇧</kbd> + <kbd>↵</kbd> for new line
+              </span>
+            )}
+          </div>
+        </div>
       </div>
-      {error ? (
-        <div className="composer-foot" style={{ color: "var(--danger)" }}>
-          {error}
-        </div>
-      ) : (
-        <div className="composer-foot">
-          Press <kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for
-          new line · Axis keeps full conversation context
-        </div>
-      )}
     </div>
   );
 }

@@ -7,6 +7,8 @@ running message history. Per-session memory is provided by LangGraph's
 for a thread, so the model always answers with full conversation context.
 """
 
+from functools import lru_cache
+
 from langchain_core.messages import SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import START, MessagesState, StateGraph
@@ -21,39 +23,42 @@ SYSTEM_PROMPT = (
 )
 
 
-def _make_llms() -> list[ChatGoogleGenerativeAI]:
-    s = get_settings()
-    return [
-        ChatGoogleGenerativeAI(
-            model=s.gemini_model, google_api_key=k, temperature=0.7
-        )
-        for k in s.gemini_keys
-    ]
+@lru_cache(maxsize=64)
+def _llm_for(key: str) -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
+        model=get_settings().gemini_model,
+        google_api_key=key,
+        temperature=0.7,
+    )
 
 
 def build_graph(checkpointer):
-    """Compile the conversation graph bound to a checkpointer."""
+    """Compile the conversation graph bound to a checkpointer.
+
+    The LLM is built per-request from `config.configurable.api_keys`
+    (server primary+fallback, or a single user-supplied key), so the same
+    graph serves every user.
+    """
     settings = get_settings()
-    llms = _make_llms()  # [primary, fallback?]
 
     async def call_model(state: MessagesState, config) -> dict:
-        # Full history lives in the checkpointer; cap what we send to the
-        # model for cost/latency. Keep the most recent turns.
         history = state["messages"][-settings.history_limit :]
         prompt = [SystemMessage(SYSTEM_PROMPT)]
-        rag = (config or {}).get("configurable", {}).get("rag_context")
+        cfg = (config or {}).get("configurable", {})
+        rag = cfg.get("rag_context")
         if rag:
             prompt.append(SystemMessage(rag))
         prompt.extend(history)
-        # Try primary key, fall back to spare on failure (free-tier quota).
+
+        keys = cfg.get("api_keys") or get_settings().gemini_keys
         last_exc = None
-        for i, llm in enumerate(llms):
+        for i, k in enumerate(keys):
             try:
-                response = await llm.ainvoke(prompt)
+                response = await _llm_for(k).ainvoke(prompt)
                 return {"messages": [response]}
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                if i + 1 < len(llms):
+                if i + 1 < len(keys):
                     print(f"[gemini] key {i} failed, trying fallback: {exc!r}")
         raise last_exc
 

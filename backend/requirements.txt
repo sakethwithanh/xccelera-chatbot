@@ -10,3 +10,4 @@ langchain-core>=0.3.29
 langchain-google-genai>=2.0.8
 psycopg[binary,pool]>=3.2
 feedparser>=6.0
+trafilatura>=1.8

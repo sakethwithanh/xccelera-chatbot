@@ -15,6 +15,9 @@ from .schemas import (
     NewsOut,
     SessionCreate,
     SessionOut,
+    SettingsIn,
+    SettingsOut,
+    UsageOut,
 )
 
 router = APIRouter(prefix="/api")
@@ -28,18 +31,43 @@ async def _article_block(session: dict) -> str:
     art = await db.get_article(aid)
     if not art:
         return ""
+    body = (art.get("content") or art.get("summary") or "")[:7000]
     return (
         "The user is discussing this news article. Ground your answers in "
         "it:\n"
         f"Title: {art['title']}\n"
         f"Source: {art.get('source')}\n"
         f"URL: {art['url']}\n"
-        f"Summary: {art.get('summary') or art.get('content')}"
+        f"Article:\n{body}"
     )
 
 
 def _merge_context(article_block: str, rag_context: str) -> str:
     return "\n\n".join(b for b in (article_block, rag_context) if b)
+
+
+TRIAL_EXHAUSTED_MSG = (
+    "You've used the free trial messages on Axis. To keep chatting, add your "
+    "own Google Gemini API key in **Settings** (sidebar → Settings). It's "
+    "free from https://aistudio.google.com/app/apikey and stays on your "
+    "account only."
+)
+SERVICE_ERROR_MSG = (
+    "Axis is temporarily unable to reach the free model. Please add your own "
+    "Google Gemini API key in **Settings** to continue chatting. It's free "
+    "from https://aistudio.google.com/app/apikey."
+)
+
+
+async def _pick_keys(user_id: str) -> tuple[list[str], str]:
+    """Return (api_keys, source). source in {'user','free','none'}."""
+    s = await db.get_user_settings(user_id)
+    if s and s.get("gemini_api_key"):
+        return [s["gemini_api_key"]], "user"
+    usage = await db.get_usage(user_id)
+    if usage.get("free_messages_used", 0) >= get_settings().free_message_limit:
+        return [], "none"
+    return get_settings().gemini_keys, "free"
 
 
 @router.get("/health")
@@ -95,20 +123,37 @@ async def chat(
     )
     rag_context = _merge_context(await _article_block(session), rag_context)
 
-    # LangGraph: thread_id == session_id. The checkpointer loads prior state
-    # for this thread, so the model answers with full conversation context.
-    graph = await ensure_graph(request.app)
-    result = await graph.ainvoke(
-        {"messages": [HumanMessage(body.message)]},
-        config={
-            "configurable": {
-                "thread_id": body.session_id,
-                "rag_context": rag_context,
-            }
-        },
-    )
-    reply = result["messages"][-1].content
+    # Pick which Gemini key(s) to use: user's own, or server free-trial.
+    keys, source = await _pick_keys(user_id)
 
+    if source == "none":
+        reply = TRIAL_EXHAUSTED_MSG
+        await db.add_message(body.session_id, "assistant", reply)
+        return ChatResponse(session_id=body.session_id, reply=reply)
+
+    graph = await ensure_graph(request.app)
+    try:
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(body.message)]},
+            config={
+                "configurable": {
+                    "thread_id": body.session_id,
+                    "rag_context": rag_context,
+                    "api_keys": keys,
+                }
+            },
+        )
+        reply = result["messages"][-1].content
+    except Exception as exc:  # noqa: BLE001
+        if source == "user":
+            raise
+        print(f"[chat] free key failed: {exc!r}")
+        reply = SERVICE_ERROR_MSG
+        await db.add_message(body.session_id, "assistant", reply)
+        return ChatResponse(session_id=body.session_id, reply=reply)
+
+    if source == "free":
+        await db.increment_usage(user_id)
     await db.add_message(body.session_id, "assistant", reply)
     # Embed user turns only — they carry the facts/topics worth recalling;
     # assistant text adds noise (e.g. refusals) to similarity search.
@@ -151,10 +196,23 @@ async def chat_stream(
         user_id, body.message, body.session_id
     )
     rag_context = _merge_context(await _article_block(session), rag_context)
+    keys, source = await _pick_keys(user_id)
     graph = await ensure_graph(request.app)
 
     async def gen():
         full = ""
+
+        # Quota exhausted — stream a graceful message, no LLM call.
+        if source == "none":
+            full = TRIAL_EXHAUSTED_MSG
+            yield f"data: {json.dumps({'delta': full})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            try:
+                await db.add_message(body.session_id, "assistant", full)
+            except Exception:  # noqa: BLE001
+                pass
+            return
+
         try:
             async for chunk, _meta in graph.astream(
                 {"messages": [HumanMessage(body.message)]},
@@ -162,6 +220,7 @@ async def chat_stream(
                     "configurable": {
                         "thread_id": body.session_id,
                         "rag_context": rag_context,
+                        "api_keys": keys,
                     }
                 },
                 stream_mode="messages",
@@ -172,8 +231,21 @@ async def chat_stream(
                         full += tok
                         yield f"data: {json.dumps({'delta': tok})}\n\n"
             yield f"data: {json.dumps({'done': True})}\n\n"
+            if source == "free":
+                try:
+                    await db.increment_usage(user_id)
+                except Exception:  # noqa: BLE001
+                    pass
         except Exception as exc:  # noqa: BLE001
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            if source == "free":
+                # Hide raw error from end users; ask them to add their key.
+                print(f"[chat/stream] free key failed: {exc!r}")
+                if not full:
+                    full = SERVICE_ERROR_MSG
+                    yield f"data: {json.dumps({'delta': full})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
+            else:
+                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
         finally:
             # Persist whatever was generated (covers client-abort too).
             if full:
@@ -229,5 +301,48 @@ async def discuss_article(
     art = await db.get_article(article_id)
     if not art:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Article not found")
+    # Lazily fetch full article body the first time it's discussed.
+    if art.get("content") == art.get("summary") and art.get("url"):
+        full = await news.fetch_full_text(art["url"])
+        if full and len(full) > len(art.get("summary") or ""):
+            await db.update_article_content(article_id, full)
     title = ("News: " + art["title"])[:60]
     return await db.create_session(user_id, title, news_article_id=article_id)
+
+
+# ---- Per-user settings + usage -------------------------------------------
+
+
+@router.get("/settings", response_model=SettingsOut)
+async def get_settings_route(user_id: str = Depends(current_user_id)) -> dict:
+    s = await db.get_user_settings(user_id)
+    return {
+        "has_key": bool(s and s.get("gemini_api_key")),
+        "updated_at": s.get("updated_at") if s else None,
+    }
+
+
+@router.put("/settings", response_model=SettingsOut)
+async def put_settings(
+    body: SettingsIn, user_id: str = Depends(current_user_id)
+) -> dict:
+    key = (body.gemini_api_key or "").strip() or None
+    row = await db.upsert_user_settings(user_id, key)
+    return {"has_key": bool(key), "updated_at": row.get("updated_at")}
+
+
+@router.delete("/settings", response_model=SettingsOut)
+async def delete_settings(user_id: str = Depends(current_user_id)) -> dict:
+    row = await db.upsert_user_settings(user_id, None)
+    return {"has_key": False, "updated_at": row.get("updated_at")}
+
+
+@router.get("/usage", response_model=UsageOut)
+async def get_usage_route(user_id: str = Depends(current_user_id)) -> dict:
+    s = await db.get_user_settings(user_id)
+    usage = await db.get_usage(user_id)
+    return {
+        "free_messages_used": usage.get("free_messages_used", 0),
+        "free_limit": get_settings().free_message_limit,
+        "has_key": bool(s and s.get("gemini_api_key")),
+    }

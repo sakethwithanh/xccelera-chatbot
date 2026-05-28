@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     history_limit: int = 20
     cors_origins: str = "http://localhost:5173"
     cron_secret: str | None = None
+    free_message_limit: int = 10
 
     @property
     def cors_origin_list(self) -> list[str]:
