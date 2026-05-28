@@ -1719,3 +1719,8 @@ html, body, #root { height: auto; min-height: 100%; overflow: visible; }
   backdrop-filter: blur(22px) saturate(160%);
 }
 .empty-conv .suggest button .arr { color: var(--ink-2) !important; }
+
+/* Fix: mobile sidebar overlay was forced display:none by design CSS */
+@media (max-width: 880px) {
+  .sidebar { display: flex !important; }
+}
